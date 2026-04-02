@@ -83,4 +83,4 @@ Thumbs.db
 .DS_Store
 SupabaseClient.kt
 
-*.logcat
+# *.logcat

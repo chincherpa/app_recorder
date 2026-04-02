@@ -27,6 +27,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -71,7 +74,7 @@ fun HomeScreen(viewModel: NoteViewModel = viewModel()) {
 
         Box(
             modifier = Modifier
-                .size(120.dp)
+                .size(240.dp)
                 .shadow(elevation = 8.dp, shape = CircleShape)
                 .clip(CircleShape)
                 .background(buttonColor)
@@ -95,7 +98,7 @@ fun HomeScreen(viewModel: NoteViewModel = viewModel()) {
                 imageVector = if (uiState.isRecording) Icons.Filled.Stop else Icons.Filled.Mic,
                 contentDescription = if (uiState.isRecording) "Aufnahme stoppen" else "Aufnahme starten",
                 tint = iconColor,
-                modifier = Modifier.size(52.dp)
+                modifier = Modifier.size(104.dp)
             )
         }
 
@@ -134,12 +137,20 @@ fun HomeScreen(viewModel: NoteViewModel = viewModel()) {
                 CircularProgressIndicator()
             }
         } else {
+            var expandedNoteId by rememberSaveable { mutableStateOf<Long?>(null) }
+
             LazyColumn(modifier = Modifier.fillMaxSize()) {
                 items(
                     items = uiState.notes,
                     key = { note -> note.id }
                 ) { note ->
-                    NoteCard(note = note)
+                    NoteCard(
+                        note = note,
+                        expanded = expandedNoteId == note.id,
+                        onToggle = {
+                            expandedNoteId = if (expandedNoteId == note.id) null else note.id
+                        }
+                    )
                 }
             }
         }

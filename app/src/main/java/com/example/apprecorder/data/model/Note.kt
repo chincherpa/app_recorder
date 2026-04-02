@@ -14,9 +14,10 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class Note(
     @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val id: String = "",
+    val id: Long = 0,
 
-    val text: String,
+    @SerialName("content")
+    val text: String = "",
 
     @SerialName("created_at")
     @EncodeDefault(EncodeDefault.Mode.NEVER)

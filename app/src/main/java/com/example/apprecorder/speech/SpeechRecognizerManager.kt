@@ -55,7 +55,7 @@ class SpeechRecognizerManager(
             }
 
             override fun onError(error: Int) {
-                onError(error)
+                this@SpeechRecognizerManager.onError(error)
             }
         })
     }
@@ -65,7 +65,7 @@ class SpeechRecognizerManager(
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toString())
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
         }
         recognizer.startListening(intent)
     }
