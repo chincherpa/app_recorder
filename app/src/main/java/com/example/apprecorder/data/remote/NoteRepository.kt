@@ -15,6 +15,22 @@ class NoteRepository {
     }
 
     /**
+     * Deletes a note by its id.
+     */
+    suspend fun deleteNote(id: Long) {
+        supabaseClient.postgrest["notes"].delete {
+            filter { eq("id", id) }
+        }
+    }
+
+    /**
+     * Re-inserts a previously deleted note (for undo).
+     */
+    suspend fun reInsertNote(note: Note) {
+        supabaseClient.postgrest["notes"].insert(note)
+    }
+
+    /**
      * Fetches all notes ordered by creation time (newest first).
      */
     suspend fun fetchNotes(): List<Note> {

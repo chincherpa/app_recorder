@@ -80,6 +80,42 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Optimistically removes the note from the list and marks it for deletion.
+     * Actual Supabase delete happens after the undo window expires.
+     */
+    fun deleteNote(note: Note) {
+        _uiState.update { state ->
+            state.copy(
+                notes = state.notes.filter { it.id != note.id },
+                pendingDeleteNote = note
+            )
+        }
+    }
+
+    /** Confirms delete on Supabase (called when undo window expires). */
+    fun confirmDelete(note: Note) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                repository.deleteNote(note.id)
+            } catch (e: Exception) {
+                // If delete fails, restore locally and reload
+                _uiState.update { it.copy(error = "Löschen fehlgeschlagen: ${e.message}") }
+                loadNotes()
+            }
+        }
+        _uiState.update { it.copy(pendingDeleteNote = null) }
+    }
+
+    /** Restores the pending-delete note back into the list. */
+    fun undoDelete() {
+        val note = _uiState.value.pendingDeleteNote ?: return
+        _uiState.update { state ->
+            val restored = (state.notes + note).sortedByDescending { it.createdAt }
+            state.copy(notes = restored, pendingDeleteNote = null)
+        }
+    }
+
     /** Fetches all notes from Supabase and updates the UI state. */
     fun loadNotes() {
         viewModelScope.launch(Dispatchers.IO) {

@@ -20,5 +20,8 @@ data class NoteUiState(
     val isLoading: Boolean = false,
 
     /** Non-null when an error occurred (network, speech, etc.). */
-    val error: String? = null
+    val error: String? = null,
+
+    /** Holds a recently deleted note for undo. */
+    val pendingDeleteNote: Note? = null
 )

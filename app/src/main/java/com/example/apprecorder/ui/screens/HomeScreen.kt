@@ -19,15 +19,27 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -39,13 +51,16 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.apprecorder.data.model.Note
 import com.example.apprecorder.ui.NoteViewModel
 import com.example.apprecorder.ui.screens.components.NoteCard
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(viewModel: NoteViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -53,106 +68,169 @@ fun HomeScreen(viewModel: NoteViewModel = viewModel()) {
         if (isGranted) viewModel.startRecording()
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .padding(top = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    // Show undo snackbar when a note is pending delete
+    LaunchedEffect(uiState.pendingDeleteNote) {
+        val note = uiState.pendingDeleteNote ?: return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = "Notiz gelöscht",
+            actionLabel = "RÜCKGÄNGIG",
+            duration = SnackbarDuration.Short, // ~5s
+            withDismissAction = true
+        )
+        when (result) {
+            SnackbarResult.ActionPerformed -> viewModel.undoDelete()
+            SnackbarResult.Dismissed -> viewModel.confirmDelete(note)
+        }
+    }
 
-        // ── Großer runder Button ───────────────────────────────────────────
-        val buttonColor = if (uiState.isRecording)
-            MaterialTheme.colorScheme.error
-        else
-            MaterialTheme.colorScheme.primary
-
-        val iconColor = if (uiState.isRecording)
-            MaterialTheme.colorScheme.onError
-        else
-            MaterialTheme.colorScheme.onPrimary
-
-        Box(
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { innerPadding ->
+        Column(
             modifier = Modifier
-                .size(240.dp)
-                .shadow(elevation = 8.dp, shape = CircleShape)
-                .clip(CircleShape)
-                .background(buttonColor)
-                .clickable {
-                    if (uiState.isRecording) {
-                        viewModel.stopRecording()
-                    } else {
-                        val permission = Manifest.permission.RECORD_AUDIO
-                        if (ContextCompat.checkSelfPermission(context, permission) ==
-                            PackageManager.PERMISSION_GRANTED
-                        ) {
-                            viewModel.startRecording()
-                        } else {
-                            permissionLauncher.launch(permission)
-                        }
-                    }
-                },
-            contentAlignment = Alignment.Center
+                .fillMaxSize()
+                .statusBarsPadding()
+                .padding(innerPadding)
+                .padding(top = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(
-                imageVector = if (uiState.isRecording) Icons.Filled.Stop else Icons.Filled.Mic,
-                contentDescription = if (uiState.isRecording) "Aufnahme stoppen" else "Aufnahme starten",
-                tint = iconColor,
-                modifier = Modifier.size(104.dp)
-            )
-        }
 
-        // ── Live-Transkription ─────────────────────────────────────────────
-        if (uiState.partialTranscription.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = uiState.partialTranscription,
+            // ── Großer runder Button ───────────────────────────────────────────
+            val buttonColor = if (uiState.isRecording)
+                MaterialTheme.colorScheme.error
+            else
+                MaterialTheme.colorScheme.primary
+
+            val iconColor = if (uiState.isRecording)
+                MaterialTheme.colorScheme.onError
+            else
+                MaterialTheme.colorScheme.onPrimary
+
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.secondary
-            )
-        }
-
-        // ── Fehlermeldung ──────────────────────────────────────────────────
-        val error = uiState.error
-        if (error != null) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = error,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error
-            )
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // ── Notizenliste ───────────────────────────────────────────────────
-        if (uiState.isLoading) {
-            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        } else {
-            var expandedNoteId by rememberSaveable { mutableStateOf<Long?>(null) }
-
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(
-                    items = uiState.notes,
-                    key = { note -> note.id }
-                ) { note ->
-                    NoteCard(
-                        note = note,
-                        expanded = expandedNoteId == note.id,
-                        onToggle = {
-                            expandedNoteId = if (expandedNoteId == note.id) null else note.id
+                    .size(240.dp)
+                    .shadow(elevation = 8.dp, shape = CircleShape)
+                    .clip(CircleShape)
+                    .background(buttonColor)
+                    .clickable {
+                        if (uiState.isRecording) {
+                            viewModel.stopRecording()
+                        } else {
+                            val permission = Manifest.permission.RECORD_AUDIO
+                            if (ContextCompat.checkSelfPermission(context, permission) ==
+                                PackageManager.PERMISSION_GRANTED
+                            ) {
+                                viewModel.startRecording()
+                            } else {
+                                permissionLauncher.launch(permission)
+                            }
                         }
-                    )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (uiState.isRecording) Icons.Filled.Stop else Icons.Filled.Mic,
+                    contentDescription = if (uiState.isRecording) "Aufnahme stoppen" else "Aufnahme starten",
+                    tint = iconColor,
+                    modifier = Modifier.size(104.dp)
+                )
+            }
+
+            // ── Live-Transkription ─────────────────────────────────────────────
+            if (uiState.partialTranscription.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = uiState.partialTranscription,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+            }
+
+            // ── Fehlermeldung ──────────────────────────────────────────────────
+            val error = uiState.error
+            if (error != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = error,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // ── Notizenliste ───────────────────────────────────────────────────
+            if (uiState.isLoading) {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                var expandedNoteId by rememberSaveable { mutableStateOf<Long?>(null) }
+
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    items(
+                        items = uiState.notes,
+                        key = { note -> note.id }
+                    ) { note ->
+                        SwipeToDismissNoteCard(
+                            note = note,
+                            expanded = expandedNoteId == note.id,
+                            onToggle = {
+                                expandedNoteId = if (expandedNoteId == note.id) null else note.id
+                            },
+                            onDismiss = { viewModel.deleteNote(note) }
+                        )
+                    }
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeToDismissNoteCard(
+    note: Note,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.StartToEnd) {
+                onDismiss()
+                true
+            } else {
+                false
+            }
+        }
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        backgroundContent = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.errorContainer)
+                    .padding(horizontal = 24.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Löschen",
+                    tint = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+        },
+        enableDismissFromEndToStart = false
+    ) {
+        NoteCard(note = note, expanded = expanded, onToggle = onToggle)
     }
 }
