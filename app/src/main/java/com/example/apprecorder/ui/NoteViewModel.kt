@@ -4,6 +4,7 @@ import android.app.Application
 import android.speech.SpeechRecognizer
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.apprecorder.data.model.Note
 import com.example.apprecorder.data.remote.NoteRepository
 import com.example.apprecorder.speech.SpeechRecognizerManager
 import kotlinx.coroutines.Dispatchers

@@ -215,18 +215,21 @@ private fun SwipeToDismissNoteCard(
     SwipeToDismissBox(
         state = dismissState,
         backgroundContent = {
+            val isSwiping = dismissState.targetValue == SwipeToDismissBoxValue.StartToEnd
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.errorContainer)
+                    .background(if (isSwiping) MaterialTheme.colorScheme.errorContainer else androidx.compose.ui.graphics.Color.Transparent)
                     .padding(horizontal = 24.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Löschen",
-                    tint = MaterialTheme.colorScheme.onErrorContainer
-                )
+                if (isSwiping) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Löschen",
+                        tint = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
             }
         },
         enableDismissFromEndToStart = false
